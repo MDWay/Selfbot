@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="JDA-3.1.0_204-javadoc">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../JDA-3.1.0_204-withDependencies.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="jar://$PROJECT_DIR$/../JDA-3.1.0_204-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/../JDA-3.1.0_204-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

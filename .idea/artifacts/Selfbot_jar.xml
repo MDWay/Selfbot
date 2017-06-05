@@ -1,0 +1,10 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="Selfbot:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/Selfbot_jar</output-path>
+    <root id="archive" name="Selfbot.jar">
+      <element id="module-output" name="Selfbot" />
+      <element id="extracted-dir" path="$APPLICATION_HOME_DIR$/redist/annotations-java8.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/../discordjda/JDA-3.0.0_157-withDependencies.jar" path-in-jar="/" />
+    </root>
+  </artifact>
+</component>
