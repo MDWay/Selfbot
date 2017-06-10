@@ -13,6 +13,7 @@ import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Scanner;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -21,6 +22,27 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  */
 public class MessageListener extends ListenerAdapter {
     private static final Rot rotter = new Rot();
+    private static String SANDUHRDINGS = "                  -`\n" +
+            "                 .o+`\n" +
+            "                `ooo/\n" +
+            "               `+oooo:\n" +
+            "              `+oooooo:\n" +
+            "              -+oooooo+:\n" +
+            "            `/:-:++oooo+:\n" +
+            "           `/++++/+++++++:\n" +
+            "          `/++++++++++++++:\n" +
+            "         `/+++ooooooooooooo/`\n" +
+            "        ./ooosssso++osssssso+`\n" +
+            "       .oossssso-`` ``/ossssss+`\n" +
+            "      -osssssso.      :ssssssso.\n" +
+            "     :osssssss/        osssso+++.\n" +
+            "    /ossssssss/        +ssssooo/-\n" +
+            "  `/ossssso+/:-        -:/+osssso+-\n" +
+            " `+sso+:-`                 `.-/+oso:\n" +
+            "`++:.                           `-/+/\n" +
+            ".`";
+
+
     private Config config;
 
     public MessageListener(Config c) {
@@ -65,10 +87,19 @@ public class MessageListener extends ListenerAdapter {
         if (raw.matches("(?is)^::rot\\s.+")) {
             mes = rot(event);
         }
+        if (raw.matches("(?is)^::sanduhrdings")) {
+            mes = sanduhrdings(event);
+        }
         if (deleteAfter && mes != null) {
             mes.delete().queueAfter(5, SECONDS);
         }
     }
+
+    private Message sanduhrdings(MessageReceivedEvent event) {
+        event.getMessage().delete().queue();
+        return event.getChannel().sendMessage("```\n" + SANDUHRDINGS + "\n```").complete();
+    }
+
 
     private Message rot(MessageReceivedEvent event) {
         String[] parts = event.getMessage().getRawContent().replaceFirst("(?i)^:[:>]rot\\s+", "").split("\\s+", 2);
