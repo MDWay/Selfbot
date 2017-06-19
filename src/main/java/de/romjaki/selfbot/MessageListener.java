@@ -13,7 +13,6 @@ import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Scanner;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -42,6 +41,12 @@ public class MessageListener extends ListenerAdapter {
             "`++:.                           `-/+/\n" +
             ".`";
 
+    private static String PLUS_SIGN = "```\n" +
+            "  +\n" +
+            "  +\n" +
+            "+++++\n" +
+            "  +\n" +
+            "  +```";
 
     private Config config;
 
@@ -89,6 +94,9 @@ public class MessageListener extends ListenerAdapter {
         }
         if (raw.matches("(?is)^::sanduhrdings")) {
             mes = sanduhrdings(event);
+        }
+        if (raw.equals("+")) {
+            message.editMessage(PLUS_SIGN).queue();
         }
         if (deleteAfter && mes != null) {
             mes.delete().queueAfter(5, SECONDS);
