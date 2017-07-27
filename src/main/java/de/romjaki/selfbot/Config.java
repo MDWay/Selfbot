@@ -15,9 +15,13 @@ public class Config {
     @Configurable
     public String TOKEN;
     @Configurable
-    public String NAME;
+    public String MAIL;
     @Configurable
-    public String WEBLINK;
+    public String PASSWORD;
+    @Configurable
+    public String AUTH_METHOD;
+    @Configurable
+    public String WEBLINK = "http://google.de/";
 
 
     private Config() {
