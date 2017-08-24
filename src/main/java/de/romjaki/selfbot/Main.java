@@ -27,6 +27,7 @@ public class Main {
 
     public static void main(String[] args) {
         Config c = Config.getConfig(String.join(" ", args));
+        System.out.println(c.TOKEN);
         jda = null;
         try {
             if (c.AUTH_METHOD.equalsIgnoreCase("TOKEN")) {
@@ -70,6 +71,7 @@ public class Main {
             se.eval("var imports = new JavaImporter(" +
                     "java.nio.file," +
                     "java.lang," +
+                    "java.util.stream,"+
                     "java.lang.management," +
                     "java.text," +
                     "java.sql," +

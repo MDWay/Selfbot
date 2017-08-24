@@ -3,21 +3,25 @@ package de.romjaki.selfbot;
 import net.dv8tion.jda.core.EmbedBuilder;
 import net.dv8tion.jda.core.entities.Game;
 import net.dv8tion.jda.core.entities.Message;
+import net.dv8tion.jda.core.entities.MessageEmbed;
 import net.dv8tion.jda.core.entities.MessageHistory;
 import net.dv8tion.jda.core.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.core.events.message.guild.react.GenericGuildMessageReactionEvent;
 import net.dv8tion.jda.core.hooks.ListenerAdapter;
 import net.dv8tion.jda.core.utils.SimpleLog;
-import org.fabianm.brainfuck.BrainfuckEngine;
 
 import java.awt.*;
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.SequenceInputStream;
 import java.lang.reflect.Field;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Scanner;
+import java.util.*;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
 
+import static de.romjaki.selfbot.Main.jda;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
@@ -25,6 +29,8 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  */
 public class MessageListener extends ListenerAdapter {
     private static final Rot rotter = new Rot();
+    static AtomicInteger name = new AtomicInteger(0);
+    static Pattern regionalPattern = Pattern.compile("regional_indicator_(?<char>[a-z])", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     private static String SANDUHRDINGS = "                  -`\n" +
             "                 .o+`\n" +
             "                `ooo/\n" +
@@ -44,7 +50,6 @@ public class MessageListener extends ListenerAdapter {
             " `+sso+:-`                 `.-/+oso:\n" +
             "`++:.                           `-/+/\n" +
             ".`";
-
     private static String PLUS_SIGN = "```\n" +
             "  +\n" +
             "  +\n" +
@@ -53,11 +58,66 @@ public class MessageListener extends ListenerAdapter {
             "  +\n" +
             "  +\n" +
             "  +```";
-
+    private static String CODEBLOCK = "To make a codeblock:\n" +
+            "\n" +
+            "\\`\\`\\`Language here\n" +
+            "code here\n" +
+            "\\`\\`\\`\n" +
+            "\n" +
+            "~ ~ ~ ~ ~ \n" +
+            "\n" +
+            "For example:\n" +
+            "\n" +
+            "\\`\\`\\`C\n" +
+            "#include <iostream>\n" +
+            "#include <cstdlib>\n" +
+            "\n" +
+            "int main()\n" +
+            "{\n" +
+            "\tstd::cout << \"Hello world!\\n\";\n" +
+            "\treturn EXIT_SUCESS;\n" +
+            "}\n" +
+            "\\`\\`\\`\n" +
+            "\n" +
+            "Will print:\n" +
+            "\n" +
+            "```C\n" +
+            "#include <iostream>\n" +
+            "#include <cstdlib>\n" +
+            "\n" +
+            "int main()\n" +
+            "{\n" +
+            "\tstd::cout << \"Hello world!\\n\";\n" +
+            "\treturn EXIT_SUCESS;\n" +
+            "}\n" +
+            "```\n";
+    private static String[] strikeImages = new String[]{null};
     private Config config;
 
     public MessageListener(Config c) {
         this.config = c;
+    }
+
+    public static String getNextName() {
+        return "" + name.getAndIncrement();
+    }
+
+    private static String constructHangman(String realWord, char[] alreadyGuessed) {
+        String d = "";
+        for (int i = 0; i < realWord.length(); i++) {
+            char c = realWord.charAt(i);
+            d += contains(alreadyGuessed, c) ? c : '-';
+        }
+        return d;
+    }
+
+    private static boolean contains(char[] alreadyGuessed, char c) {
+        for (char ch : alreadyGuessed) {
+            if (ch == c) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -106,15 +166,119 @@ public class MessageListener extends ListenerAdapter {
         if (raw.matches("(?is)^::purge\\s.*")) {
             purge(event);
         }
+        if (raw.matches("(?is)^::codeblock.*")) {
+            mes = codeblock(event);
+        }
         if (raw.matches("(?is)^::eval\\s.*")) {
             Thread t = new Thread(() -> eval(event));
             t.start();
             mes = null;
         }
+        if (raw.matches("(?is)^::hangman\\s.*")) {
+            mes = hangman(event);
+        }
         if (deleteAfter && mes != null) {
             mes.delete().queueAfter(5, SECONDS);
         }
 
+    }
+
+    private Message hangman(MessageReceivedEvent event) {
+        SimpleLog.getLog("info").info("in hangman");
+        String word = event.getMessage().getContent().replaceAll("(?is)^[>:]:hangman\\s+", "");
+        event.getMessage().editMessage(hangmanEmbed(constructHangman(word, new char[0]), "").build()).queue();
+        startHangmanProccess(event.getMessage(), word);
+        return event.getMessage();
+    }
+
+    private EmbedBuilder hangmanEmbed(String s, String guesses) {
+        return new EmbedBuilder()
+                .setTitle("HANGMAN")
+                .setDescription(s)
+                .addField("Guesses", "`" + String.join(", ", guesses.split("")) + "`", false)
+                .setColor(Color.blue);
+
+    }
+
+    private void startHangmanProccess(Message message, String realWord) {
+        jda.addEventListener(new ListenerAdapter() {
+            @Override
+            public void onGenericGuildMessageReaction(GenericGuildMessageReactionEvent event) {
+                if (event.getMessageIdLong() != message.getIdLong()) {
+                    return;
+                }
+                if (event.getMember().getUser().isBot()) {
+                    return;
+                }
+                SimpleLog.getLog("hangman").info("in hangman");
+                Message mes = event.getChannel().getHistoryAround(event.getMessageId(), 2).complete().getMessageById(event.getMessageId());
+                List<MessageEmbed> embeds = mes.getEmbeds();
+                String guesses = null;
+                int strikes = 0;
+                if (!embeds.isEmpty()) {
+                    for (MessageEmbed embed : embeds) {
+                        for (MessageEmbed.Field field : embed.getFields()) {
+                            if (field.getName().toLowerCase().contains("guesses")) {
+                                guesses = field.getValue().replaceAll("[^a-z]", "");
+                            }
+                            if (field.getName().toLowerCase().contains("strikes")) {
+                                strikes = Integer.parseInt(field.getValue());
+                            }
+                            if (field.getName().toLowerCase().contains("solved")) {
+                                return;
+                            }
+                        }
+                    }
+                }
+                if (strikes > realWord.length() / 3 + 3) {
+                    return;
+                }
+                char emoteD = Character.toLowerCase((char) (event.getReactionEmote().toString().charAt(4) - '\uDDE6' + 'a'));
+                SimpleLog.getLog("hangman").info(emoteD);
+                if (emoteD < 'a' || emoteD > 'z') {
+                    return;
+                }
+                if (guesses.contains(String.valueOf(emoteD))) {
+                    return;
+                }
+                if (!realWord.contains(String.valueOf(emoteD))) {
+                    strikes++;
+                }
+                guesses += emoteD;
+                String display = constructHangman(realWord, guesses.toCharArray());
+
+                EmbedBuilder eB = hangmanEmbed(display, guesses);
+                if (display.equalsIgnoreCase(realWord)) {
+                    eB.addField("Solved by", event.getMember().getAsMention(), false);
+                    eB.setColor(Color.green);
+                }
+                if (strikes > realWord.length() / 3 + 3) {
+                    eB.setColor(Color.red);
+                    eB.addField("FAILED", "(by) " + event.getMember().getAsMention(), false);
+                }
+                if (strikes > 0) {
+                    eB.addField("Strikes", strikes + "", false);
+                    eB.setImage(getImageForStrikes(strikes, realWord.length() / 3 + 3));
+                }
+                message.editMessage(eB.build()).queue();
+            }
+        });
+    }
+
+    private String getImageForStrikes(int strikes, int maxStrikes) {
+        int index = strikes * strikeImages.length / maxStrikes;
+        if (index >= strikeImages.length) {
+            return null;
+        }
+        if (index < 0) {
+            return null;
+        }
+        return strikeImages[index];
+    }
+
+    private Message codeblock(MessageReceivedEvent event) {
+        event.getMessage().editMessage(CODEBLOCK).queue();
+        return event.getMessage();
     }
 
     private void eval(MessageReceivedEvent event) {
@@ -135,10 +299,16 @@ public class MessageListener extends ListenerAdapter {
                 out = evalBf(x, parts[2]);
                 break;
             case "java":
+                parts[2] = parts[2].replaceAll("(?is)(?<rest>.*)<#(?<id>[0-9]+)>", "${rest}jda.getTextChannelById(\"${id}\")");//TEXTCHANNELS
+                parts[2] = parts[2].replaceAll("(?is)(?<rest>.*)<@!?(?<id>[0-9]+)>", "${rest}guild.getMemberById(\"${id}\")");//MEMBERS
+                parts[2] = parts[2].replaceAll("(?is)(?<rest>.*)<@&(?<id>[0-9]+)>", "${rest}guild.getRoleById(\"${id}\")");//ROLES
+                parts[2] = parts[2].replaceAll("(?is)(?<rest>.*)<:(?<name>[a-z0-9]+):(?<id>[0-9]+)>", "${rest}jda.getEmoteById(\"${id}\")");//EMOTES
+
                 Map<String, Object> map = new HashMap<>();
                 map.put("channel", event.getChannel());
                 map.put("message", event.getMessage());
                 map.put("guild", event.getGuild());
+
                 out = Main.eval(parts[2], map);
                 break;
             case "python":
@@ -157,36 +327,92 @@ public class MessageListener extends ListenerAdapter {
         event.getMessage().editMessage(eB.build()).queue();
     }
 
-    private Object evalBf(int cells, String part) {
-        StringWriter writer = new StringWriter();
-        BrainfuckEngine engine = new BrainfuckEngine(cells, new BufferedOutputStream(new OutputStream() {
-            @Override
-            public void write(int b) throws IOException {
-                writer.write(b);
+    private Object evalBf(int cellcount, String part) {
+        byte[] cells = new byte[cellcount];
+        int pointer = 0;
+        Arrays.fill(cells, (byte) 0x0);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < part.length(); i++) {
+            char c = part.charAt(i);
+            switch (c) {
+                case '+': {
+                    cells[pointer]++;
+                    break;
+                }
+                case '-': {
+                    cells[pointer]--;
+                    break;
+                }
+                case '<': {
+                    pointer--;
+                    break;
+                }
+                case '>': {
+                    pointer++;
+                    break;
+                }
+                case '.': {
+                    sb.append(cells[pointer]);
+                    break;
+                }
+                case '[': {
+                    if (cells[pointer] == (byte) 0x00) {
+                        int depth = 0;
+                        for (; i < part.length(); i++) {
+                            char d = part.charAt(c);
+                            if (d == '[') {
+                                depth++;
+                            }
+                            if (d == ']') {
+                                depth--;
+                            }
+                            if (depth == 0) {
+                                break;
+                            }
+                        }
+                    }
+                    break;
+                }
+                case ']': {
+                    if (cells[pointer] != (byte) 0x00) {
+                        int depth = 0;
+                        for (; i >= 0; i--) {
+                            char d = part.charAt(c);
+                            if (d == ']') {
+                                depth++;
+                            }
+                            if (d == '[') {
+                                depth--;
+                            }
+                            if (depth == 0) {
+                                break;
+                            }
+                        }
+                    }
+                }
             }
-        }));
-        try {
-            engine.interpret(part);
-        } catch (Exception e) {
-            return e;
+            if (pointer < 0) {
+                pointer += cellcount;
+            }
+            pointer %= cellcount;
         }
-        return writer.getBuffer();
+        return sb.toString();
     }
 
     private Object evalPy(String part) {
         try {
-            Process p = Runtime.getRuntime().exec(new String[]{"python"});
-            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(p.getOutputStream()));
+            String tempF = getNextName() + ".py";
+            BufferedWriter writer = new BufferedWriter(new FileWriter(tempF));
             writer.write(part);
             writer.flush();
-            p.waitFor();
-            Scanner s = new Scanner(p.getInputStream());
+            writer.close();
+            Process p = Runtime.getRuntime().exec(new String[]{"python", tempF});
+            Scanner s = new Scanner(new SequenceInputStream(p.getInputStream(), p.getErrorStream()));
             s.useDelimiter("\\A");
-            return s.next();
+            return s;
         } catch (Exception e) {
             return e;
         }
-
     }
 
     private void purge(MessageReceivedEvent event) {
