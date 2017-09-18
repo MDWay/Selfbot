@@ -1,10 +1,7 @@
 package de.romjaki.selfbot;
 
 import jdk.nashorn.api.scripting.NashornScriptEngineFactory;
-import net.dv8tion.jda.client.JDAClientBuilder;
-import net.dv8tion.jda.core.AccountType;
-import net.dv8tion.jda.core.JDA;
-import net.dv8tion.jda.core.JDABuilder;
+import net.dv8tion.jda.core.*;
 import net.dv8tion.jda.core.exceptions.RateLimitedException;
 import net.dv8tion.jda.core.utils.SimpleLog;
 
@@ -26,21 +23,18 @@ public class Main {
     }
 
     public static void main(String[] args) {
-        Config c = Config.getConfig(String.join(" ", args));
+        System.out.println(JDAInfo.VERSION);
+        System.out.println(System.getProperty("config.file"));
+        Config c = Config.getConfig(System.getProperty("config.file"));
         System.out.println(c.TOKEN);
         jda = null;
         try {
             if (c.AUTH_METHOD.equalsIgnoreCase("TOKEN")) {
                 jda = new JDABuilder(AccountType.CLIENT)
                         .setToken(c.TOKEN)
+                        .setStatus(OnlineStatus.INVISIBLE)
                         .addEventListener(new MessageListener(c))
                         .buildBlocking();
-            } else {
-                jda = new JDAClientBuilder()
-                        .setEmail(c.MAIL)
-                        .setPassword(c.PASSWORD)
-                        .addListener(new MessageListener(c))
-                        .buildBlocking().getJDA();
             }
         } catch (LoginException | RateLimitedException | InterruptedException e) {
             SimpleLog.getLog("startup").fatal(String.format("Failed to connect: %s", e));
@@ -71,7 +65,7 @@ public class Main {
             se.eval("var imports = new JavaImporter(" +
                     "java.nio.file," +
                     "java.lang," +
-                    "java.util.stream,"+
+                    "java.util.stream," +
                     "java.lang.management," +
                     "java.text," +
                     "java.sql," +

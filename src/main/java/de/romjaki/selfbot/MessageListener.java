@@ -1,10 +1,7 @@
 package de.romjaki.selfbot;
 
 import net.dv8tion.jda.core.EmbedBuilder;
-import net.dv8tion.jda.core.entities.Game;
-import net.dv8tion.jda.core.entities.Message;
-import net.dv8tion.jda.core.entities.MessageEmbed;
-import net.dv8tion.jda.core.entities.MessageHistory;
+import net.dv8tion.jda.core.entities.*;
 import net.dv8tion.jda.core.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.core.events.message.guild.react.GenericGuildMessageReactionEvent;
 import net.dv8tion.jda.core.hooks.ListenerAdapter;
@@ -19,7 +16,6 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Pattern;
 
 import static de.romjaki.selfbot.Main.jda;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -29,8 +25,9 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  */
 public class MessageListener extends ListenerAdapter {
     private static final Rot rotter = new Rot();
+    private static final String AFK_IMAGE = "http://unisci24.com/data_images/wlls/2/174841-afk.jpg";
+    static boolean AFK = false;
     static AtomicInteger name = new AtomicInteger(0);
-    static Pattern regionalPattern = Pattern.compile("regional_indicator_(?<char>[a-z])", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     private static String SANDUHRDINGS = "                  -`\n" +
             "                 .o+`\n" +
             "                `ooo/\n" +
@@ -123,7 +120,26 @@ public class MessageListener extends ListenerAdapter {
     @Override
     public void onMessageReceived(MessageReceivedEvent event) {
         if (!event.getAuthor().equals(event.getJDA().getSelfUser())) {
+            if (AFK && event.getMessage().getMentionedUsers().contains(jda.getSelfUser())) {
+                event.getChannel().sendMessage(new EmbedBuilder()
+                        .setColor(Color.green)
+                        .setImage(AFK_IMAGE)
+                        .setTitle("AFK")
+                        .setDescription(jda.getSelfUser().getAsMention() + " is AFK.")
+                        .setFooter("This afk-disclaimer was triggered because you mentioned " + jda.getSelfUser().getAsMention(), jda.getSelfUser().getEffectiveAvatarUrl())
+                        .build()).queue(message -> message.delete().queueAfter(20, SECONDS));
+            }
             return;
+        }
+        List<MessageEmbed> embeds = event.getMessage().getEmbeds();
+        boolean containsAfk = false;
+        for (MessageEmbed embed : embeds) {
+            if (embed.getTitle().toLowerCase().contains("afk")) {
+                containsAfk = true;
+            }
+        }
+        if (!containsAfk && AFK) {
+            AFK = false;
         }
         Message message = event.getMessage();
         String raw = message.getRawContent();
@@ -174,6 +190,14 @@ public class MessageListener extends ListenerAdapter {
             t.start();
             mes = null;
         }
+        if (raw.matches("(?is)^::moveto\\s.*")) {
+            mes = moveTo(event);
+        }
+        if (raw.matches("(?is)^::afk.*")) {
+            AFK = true;
+            event.getMessage().delete().queue();
+            mes = null;
+        }
         if (raw.matches("(?is)^::hangman\\s.*")) {
             mes = hangman(event);
         }
@@ -181,6 +205,32 @@ public class MessageListener extends ListenerAdapter {
             mes.delete().queueAfter(5, SECONDS);
         }
 
+    }
+
+    private Message moveTo(MessageReceivedEvent event) {
+        Message m = event.getMessage();
+        String[] parts = m.getRawContent().split("\\s+", 3);
+        if (parts.length < 2) {
+            m.editMessage(new EmbedBuilder()
+                    .setTitle("MOVE FAILED")
+                    .setDescription("Missing category")
+                    .build()).queue();
+            return m;
+        }
+        String cat = parts[1].replaceAll("#|>|<", "");
+        String reason = "Moved.";
+        if (parts.length == 3) {
+            reason = parts[2];
+        }
+        TextChannel toMove = event.getTextChannel();
+        Category moveTo = event.getGuild().getCategoryById(cat);
+        toMove.getManager().setParent(moveTo).reason(reason).queue();
+        m.editMessage(new EmbedBuilder()
+                .setTitle("MOVE SUCCEEDED")
+                .setDescription("Moved " + toMove.getAsMention() + " to <#" + moveTo.getId() + ">")
+                .setColor(Color.green)
+                .build()).queue();
+        return m;
     }
 
     private Message hangman(MessageReceivedEvent event) {
