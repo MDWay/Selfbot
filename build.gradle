@@ -10,14 +10,11 @@ description = """"""
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
-run {
-    systemProperty "config.file", project.getProperty("config.file")
-}
 
 repositories {
     jcenter()
 }
 dependencies {
-    compile group: 'org.apache.commons', name: 'commons-math3', version:'3.4'
-    compile group: 'net.dv8tion', name: 'JDA', version:'3.3.0_272'
+    compile group: 'org.apache.commons', name: 'commons-math3', version: '3.4'
+    compile group: 'net.dv8tion', name: 'JDA', version: '3.3.0_272'
 }

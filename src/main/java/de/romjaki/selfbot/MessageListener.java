@@ -134,8 +134,10 @@ public class MessageListener extends ListenerAdapter {
         List<MessageEmbed> embeds = event.getMessage().getEmbeds();
         boolean containsAfk = false;
         for (MessageEmbed embed : embeds) {
-            if (embed.getTitle().toLowerCase().contains("afk")) {
-                containsAfk = true;
+            if (embed.getTitle() != null) {
+                if (embed.getTitle().toLowerCase().contains("afk")) {
+                    containsAfk = true;
+                }
             }
         }
         if (!containsAfk && AFK) {
@@ -337,7 +339,7 @@ public class MessageListener extends ListenerAdapter {
             event.getMessage().editMessage("Error: Use `::event <java|python|bf> <code>");
             return;
         }
-        Object out = "";
+        Object out;
         int x = 8;
         if (parts[1].matches(".*\\d$")) {
             x = Integer.parseInt(parts[1].replaceFirst("b(rain)?f(uck)?", ""));
@@ -586,7 +588,7 @@ public class MessageListener extends ListenerAdapter {
         EmbedBuilder embed = new EmbedBuilder();
         MessageHistory h = event.getChannel().getHistoryAround(args[0], 2).complete();
         Message cited = h.getMessageById(args[0]);
-        embed.setAuthor(cited.getAuthor().getName(), "https://discordapp.com", cited.getAuthor().getAvatarUrl());
+        embed.setAuthor(cited.getAuthor().getName(), "https://discordapp.com/channels/@me/" + cited.getAuthor().getId(), cited.getAuthor().getAvatarUrl());
         embed.setColor(Color.CYAN);
         embed.setDescription(cited.getContent());
         embed.addField("**" + event.getJDA().getSelfUser().getName() + "** kommentiert:", args[1], true);

@@ -5,7 +5,8 @@ import net.dv8tion.jda.core.utils.SimpleLog;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.Scanner;
+import java.util.Hashtable;
+import java.util.Properties;
 import java.util.stream.Stream;
 
 /**
@@ -32,30 +33,15 @@ public class Config {
     }
 
     public static Config getConfig(File file) {
+        file = file.getAbsoluteFile();
         if (file.isDirectory()) {
             SimpleLog.getLog("startup").fatal("Config file is a directory");
             System.exit(1);
         }
-        try (Scanner s = new Scanner(file)) {
-            Config c = new Config();
-            Class<? extends Config> clazz = c.getClass();
-            while (s.hasNextLine()) {
-                String line = s.nextLine();
-                String[] tmp = line.split(":", 2);
-                String key = tmp[0].trim();
-                String val = tmp[1].trim();
-                if (val.isEmpty()) continue;
-                try {
-                    Field f = clazz.getField(key.toUpperCase());
-                    if (f == null || !f.isAnnotationPresent(Configurable.class) || Modifier.isStatic(f.getModifiers()))
-                        continue;
-                    f.set(c, val);
-                } catch (Exception e) {
-                    continue;
-                }
-            }
-            return c;
-        } catch (FileNotFoundException e) {
+        Properties props = new Properties();
+        try (InputStream is = new FileInputStream(file)) {
+            props.load(is);
+        } catch (IOException e) {
             SimpleLog.getLog("startup").fatal("Config not found. Trying to generate file. Fill in the information and restart.");
             if (!file.getParentFile().exists()) {
                 file.getParentFile().mkdirs();
@@ -69,7 +55,20 @@ public class Config {
             }
             System.exit(1);
         }
-        return null;
+        Config c = new Config();
+        Class<? extends Config> clazz = c.getClass();
+        ((Hashtable<String, String>) (Hashtable)props).forEach((key, val) -> {
+            if (val.isEmpty()) return;
+            try {
+                Field f = clazz.getField(key.toUpperCase());
+                if (f == null || !f.isAnnotationPresent(Configurable.class) || Modifier.isStatic(f.getModifiers()))
+                    return;
+                f.set(c, val);
+            } catch (Exception e) {
+                return;
+            }
+        });
+        return c;
     }
 
     private static void writeTemplateToFile(File file) {
@@ -83,7 +82,7 @@ public class Config {
 
     private static String buildTemplate() {
         StringBuilder sb = new StringBuilder();
-        Stream.of(Config.class.getFields()).forEach(s -> sb.append(s.getName().toUpperCase()).append(':').append(System.lineSeparator()));
+        Stream.of(Config.class.getFields()).forEach(s -> sb.append(s.getName().toUpperCase()).append('=').append(System.lineSeparator()));
         return sb.toString();
     }
 }

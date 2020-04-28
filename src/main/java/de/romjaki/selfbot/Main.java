@@ -24,8 +24,7 @@ public class Main {
 
     public static void main(String[] args) {
         System.out.println(JDAInfo.VERSION);
-        System.out.println(System.getProperty("config.file"));
-        Config c = Config.getConfig(System.getProperty("config.file"));
+        Config c = Config.getConfig("config.properties");
         System.out.println(c.TOKEN);
         jda = null;
         try {
@@ -65,6 +64,8 @@ public class Main {
             se.eval("var imports = new JavaImporter(" +
                     "java.nio.file," +
                     "java.lang," +
+                    "java.awt," +
+                    "java.awt.datatransfer," +
                     "java.util.stream," +
                     "java.lang.management," +
                     "java.text," +
